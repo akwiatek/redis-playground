@@ -1,29 +1,32 @@
 package pl.kwiatek.redis;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.pubsub.RedisPubSubAdapter;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
+import lombok.RequiredArgsConstructor;
 
-public class RedisSubscribingThread extends Thread {
+@RequiredArgsConstructor
+public class RedisSubscribingThread extends Thread implements AutoCloseable {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final RedisClient redisClient;
     private final String[] channels;
 
     private volatile boolean shuttingDown;
 
-    public RedisSubscribingThread(RedisClient redisClient, String... channels) {
-        this.redisClient = redisClient;
-        this.channels = channels;
-    }
-
-    public void shutDown() {
+    @Override
+    public void close() throws InterruptedException {
         shuttingDown = true;
         interrupt();
+        join();
     }
 
     public void run() {
         try (StatefulRedisPubSubConnection<String, String> connection = redisClient.connectPubSub()) {
-            connection.addListener(new LoggingRedisPubSubAdapter<>());
+            connection.addListener(new LoggingRedisPubSubAdapter());
             connection.sync().subscribe(channels);
             sleepUntilShutDown();
         } catch (InterruptedException e) {
@@ -44,10 +47,17 @@ public class RedisSubscribingThread extends Thread {
         }
     }
 
-    private static class LoggingRedisPubSubAdapter<K, V> extends RedisPubSubAdapter<K, V> {
+    private static class LoggingRedisPubSubAdapter extends RedisPubSubAdapter<String, String> {
         @Override
-        public void message(K channel, V message) {
+        public void message(String channel, String message) {
             System.out.println("onMessage, channel:" + channel + ", message: " + message);
+            CancelledTestRunMessage msgObject;
+            try {
+                msgObject = MAPPER.readValue(message, CancelledTestRunMessage.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.println("msgObject: " + msgObject);
         }
     }
 }
