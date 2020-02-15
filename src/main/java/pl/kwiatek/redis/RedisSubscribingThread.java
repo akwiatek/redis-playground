@@ -30,7 +30,7 @@ public class RedisSubscribingThread extends Thread implements AutoCloseable {
 
     public void run() {
         try (StatefulRedisPubSubConnection<String, String> connection = redisClient.connectPubSub()) {
-            connection.addListener(new LoggingRedisPubSubAdapter());
+            connection.addListener(new LoggingRedisPubSubAdapter(barrier));
             barrier.await();
             connection.sync().subscribe(channels);
             sleepUntilShutDown();
@@ -52,7 +52,11 @@ public class RedisSubscribingThread extends Thread implements AutoCloseable {
         }
     }
 
+    @RequiredArgsConstructor
     private static class LoggingRedisPubSubAdapter extends RedisPubSubAdapter<String, String> {
+
+        private final CyclicBarrier barrier;
+
         @Override
         public void message(String channel, String message) {
             System.out.println("onMessage, channel:" + channel + ", message: " + message);
@@ -63,6 +67,11 @@ public class RedisSubscribingThread extends Thread implements AutoCloseable {
                 throw new RuntimeException(e);
             }
             System.out.println("msgObject: " + msgObject);
+            try {
+                barrier.await();
+            } catch (InterruptedException | BrokenBarrierException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }

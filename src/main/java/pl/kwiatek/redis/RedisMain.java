@@ -30,7 +30,7 @@ public class RedisMain {
             String json = cancelledTestRunMessage("wallmart", 20L);
             barrier.await();
             syncCommands.publish(CHANNEL, json);
-            sleep(1000L);
+            barrier.await();
         })));
     }
 
