@@ -24,10 +24,10 @@ public class RedisMain {
     }
 
     private void run() throws InterruptedException, BrokenBarrierException {
-        CyclicBarrier barrier = new CyclicBarrier(2);
+        var barrier = new CyclicBarrier(2);
         withClient(REDIS_URI, client -> whenSubscribed(client, CHANNEL, barrier, () -> withConnection(client, connection -> {
+            var json = cancelledTestRunMessage("wallmart", 20L);
             var syncCommands = connection.sync();
-            String json = cancelledTestRunMessage("wallmart", 20L);
             barrier.await();
             syncCommands.publish(CHANNEL, json);
             barrier.await();
