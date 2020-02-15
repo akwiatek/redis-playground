@@ -7,6 +7,9 @@ import io.lettuce.core.pubsub.RedisPubSubAdapter;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import lombok.RequiredArgsConstructor;
 
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+
 @RequiredArgsConstructor
 public class RedisSubscribingThread extends Thread implements AutoCloseable {
 
@@ -14,6 +17,7 @@ public class RedisSubscribingThread extends Thread implements AutoCloseable {
 
     private final RedisClient redisClient;
     private final String[] channels;
+    private final CyclicBarrier barrier;
 
     private volatile boolean shuttingDown;
 
@@ -27,9 +31,10 @@ public class RedisSubscribingThread extends Thread implements AutoCloseable {
     public void run() {
         try (StatefulRedisPubSubConnection<String, String> connection = redisClient.connectPubSub()) {
             connection.addListener(new LoggingRedisPubSubAdapter());
+            barrier.await();
             connection.sync().subscribe(channels);
             sleepUntilShutDown();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
         }
     }

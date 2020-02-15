@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+
 import static java.lang.Thread.sleep;
 
 /**
@@ -16,21 +19,22 @@ public class RedisMain {
     private static final String CHANNEL = "test-run-cancels";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public static void main(String... args) throws InterruptedException {
+    public static void main(String... args) throws InterruptedException, BrokenBarrierException {
         new RedisMain().run();
     }
 
-    private void run() throws InterruptedException {
-        String json = cancelledTestRunMessage("wallmart", 20L);
-        withClient(REDIS_URI, client -> whenSubscribed(client, CHANNEL, () -> withConnection(client, connection -> {
+    private void run() throws InterruptedException, BrokenBarrierException {
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        withClient(REDIS_URI, client -> whenSubscribed(client, CHANNEL, barrier, () -> withConnection(client, connection -> {
             var syncCommands = connection.sync();
-            sleep(1000L);
+            String json = cancelledTestRunMessage("wallmart", 20L);
+            barrier.await();
             syncCommands.publish(CHANNEL, json);
             sleep(1000L);
         })));
     }
 
-    private void withClient(String uri, InterruptableConsumer<RedisClient> consumer) throws InterruptedException {
+    private void withClient(String uri, InterruptableConsumer<RedisClient> consumer) throws InterruptedException, BrokenBarrierException {
         RedisClient client = null;
         try {
             client = RedisClient.create(uri);
@@ -42,15 +46,15 @@ public class RedisMain {
         }
     }
 
-    private void whenSubscribed(RedisClient client, String channel, InterruptableRunnable action) throws InterruptedException {
+    private void whenSubscribed(RedisClient client, String channel, CyclicBarrier barrier, InterruptableRunnable action) throws InterruptedException, BrokenBarrierException {
         String[] channels = { channel };
-        try (var subscribingThread = new RedisSubscribingThread(client, channels)) {
+        try (var subscribingThread = new RedisSubscribingThread(client, channels, barrier)) {
             subscribingThread.start();
             action.run();
         }
     }
 
-    private void withConnection(RedisClient client, InterruptableConsumer<StatefulRedisConnection<String, String>> action) throws InterruptedException {
+    private void withConnection(RedisClient client, InterruptableConsumer<StatefulRedisConnection<String, String>> action) throws InterruptedException, BrokenBarrierException {
         try (var connection = client.connect()) {
             action.accept(connection);
         }
@@ -66,10 +70,10 @@ public class RedisMain {
     }
 
     private interface InterruptableConsumer<T> {
-        void accept(T t) throws InterruptedException;
+        void accept(T t) throws InterruptedException, BrokenBarrierException;
     }
 
     private interface InterruptableRunnable {
-        void run() throws InterruptedException;
+        void run() throws InterruptedException, BrokenBarrierException;
     }
 }
