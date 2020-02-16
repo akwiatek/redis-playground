@@ -8,12 +8,6 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
-import static java.lang.Thread.sleep;
-
-/**
- * Hello world!
- *
- */
 public class RedisMain {
     private static final String REDIS_URI = "redis://localhost";
     private static final String CHANNEL = "test-run-cancels";
