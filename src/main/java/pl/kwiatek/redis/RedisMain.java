@@ -4,12 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
 import static pl.kwiatek.redis.CancelledTestRunMessage.CHANNEL;
 
+@Slf4j
 public class RedisMain {
     private static final CancelledTestRunMessage SAMPLE_MESSAGE = new CancelledTestRunMessage("wallmart", 20L);
     private static final String REDIS_URI = "redis://localhost";
@@ -25,7 +27,9 @@ public class RedisMain {
             var json = cancelledTestRunMessage();
             var syncCommands = connection.sync();
             barrier.await();
+            log.info("Publishing JSON");
             syncCommands.publish(CHANNEL, json);
+            log.info("JSON published");
             barrier.await();
         })));
     }
