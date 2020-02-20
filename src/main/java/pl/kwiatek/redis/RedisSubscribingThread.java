@@ -6,10 +6,12 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.pubsub.RedisPubSubAdapter;
 import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
+@Slf4j
 @RequiredArgsConstructor
 public class RedisSubscribingThread extends Thread implements AutoCloseable {
 
@@ -29,14 +31,18 @@ public class RedisSubscribingThread extends Thread implements AutoCloseable {
     }
 
     public void run() {
+        log.info("Connecting to Redis");
         try (StatefulRedisPubSubConnection<String, String> connection = redisClient.connectPubSub()) {
+            log.info("Connected to Redis");
             connection.addListener(new LoggingRedisPubSubAdapter(barrier));
-            barrier.await();
             connection.sync().subscribe(channels);
+            log.info("Subscribed to {}", channels);
+            barrier.await();
             sleepUntilShutDown();
         } catch (InterruptedException | BrokenBarrierException e) {
             throw new RuntimeException(e);
         }
+        log.info("Disconnected from Redis");
     }
 
     private void sleepUntilShutDown() throws InterruptedException {
@@ -59,14 +65,16 @@ public class RedisSubscribingThread extends Thread implements AutoCloseable {
 
         @Override
         public void message(String channel, String message) {
-            System.out.println("onMessage, channel:" + channel + ", message: " + message);
+            log.info("Message received");
+            log.info("channel: {}", channel);
+            log.info("message: {}", message);
             CancelledTestRunMessage msgObject;
             try {
                 msgObject = MAPPER.readValue(message, CancelledTestRunMessage.class);
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
-            System.out.println("msgObject: " + msgObject);
+            log.info("msgObject: {}", msgObject);
             try {
                 barrier.await();
             } catch (InterruptedException | BrokenBarrierException e) {
