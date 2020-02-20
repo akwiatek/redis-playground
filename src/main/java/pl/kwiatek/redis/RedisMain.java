@@ -9,6 +9,7 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
 public class RedisMain {
+    private static final CancelledTestRunMessage SAMPLE_MESSAGE = new CancelledTestRunMessage("wallmart", 20L);
     private static final String REDIS_URI = "redis://localhost";
     private static final String CHANNEL = "test-run-cancels";
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -20,7 +21,7 @@ public class RedisMain {
     private void run() throws InterruptedException, BrokenBarrierException {
         var barrier = new CyclicBarrier(2);
         withClient(REDIS_URI, client -> whenSubscribed(client, CHANNEL, barrier, () -> withConnection(client, connection -> {
-            var json = cancelledTestRunMessage("wallmart", 20L);
+            var json = cancelledTestRunMessage();
             var syncCommands = connection.sync();
             barrier.await();
             syncCommands.publish(CHANNEL, json);
@@ -54,10 +55,9 @@ public class RedisMain {
         }
     }
 
-    private String cancelledTestRunMessage(String tenant, long testRunId) {
-        var message = new CancelledTestRunMessage(tenant, testRunId);
+    private String cancelledTestRunMessage() {
         try {
-            return MAPPER.writeValueAsString(message);
+            return MAPPER.writeValueAsString(SAMPLE_MESSAGE);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
