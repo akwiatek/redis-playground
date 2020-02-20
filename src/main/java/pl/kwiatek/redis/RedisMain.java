@@ -8,10 +8,11 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
+import static pl.kwiatek.redis.CancelledTestRunMessage.CHANNEL;
+
 public class RedisMain {
     private static final CancelledTestRunMessage SAMPLE_MESSAGE = new CancelledTestRunMessage("wallmart", 20L);
     private static final String REDIS_URI = "redis://localhost";
-    private static final String CHANNEL = "test-run-cancels";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static void main(String... args) throws InterruptedException, BrokenBarrierException {
